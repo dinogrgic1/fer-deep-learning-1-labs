@@ -12,18 +12,13 @@ class PTLogreg(torch.nn.Module):
         
         # Module msut be frist initiazlied
         super().__init__()
-
         self.D = D
         self.C = C
-        self.W = torch.nn.Parameter(torch.randn(D, C, dtype=torch.double), requires_grad=True)
+        self.W = torch.nn.Parameter(torch.randn((D, C)), requires_grad=True)
         self.B = torch.nn.Parameter(torch.zeros(C), requires_grad=True)
-        
-        # inicijalizirati parametre (koristite nn.Parameter):
-        # imena mogu biti self.W, self.b
-        # ...
 
     def forward(self, X: torch.tensor) -> torch.tensor:
-        output = torch.mm(X, self.W) + self.B
+        output = X.mm(self.W) + self.B
         return torch.softmax(output, dim=1)
 
     def get_loss(self, X: torch.tensor, Yoh_: torch.tensor, param_lambdba: float) -> torch.tensor:
@@ -38,36 +33,36 @@ class PTLogreg(torch.nn.Module):
             - param_niter:  number of training iterations
             - param_delta: learning rate
         """
-        optimizer = torch.optim.SGD(params=[self.W, self.B], lr = param_delta)
+        optimizer = torch.optim.SGD(params=self.parameters(), lr = param_delta)
         for i in range(param_niter + 1):
             loss = self.get_loss(X, Yoh_, param_lambdba)
-
             loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
-            
+            optimizer.step()      
+
             if i % 10 == 0:
                 print(f'step: {i}\tloss: {loss:.6f}')
+            optimizer.zero_grad()
+            
 
-    def eval(model, X: np.array) -> np.array:
+    def eval(self, X: np.array) -> np.array:
         """Arguments:
             - model: type: PTLogreg
             - X: actual datapoints [NxD], type: np.array
             Returns: predicted class probabilites [NxC], type: np.array
         """
-        probs = torch.tensor(X)
-        argmaxes = torch.argmax(probs, dim=1)
-        return np.array(argmaxes)
+        probs = self.forward(torch.tensor(X, dtype=torch.float32))
+        probs = probs.detach().numpy()
+        return np.argmax(probs, axis=1)
 
 if __name__ == "__main__":
     np.random.seed(100)
     
-    C = 2
-    X, Y_ = sample_gmm_2d(2, C, 10)
+    C = 3
+    X, Y_ = sample_gmm_2d(3, C, 3)
     Yoh_ = class_to_onehot(Y_)
 
     ptlr = PTLogreg(X.shape[1], Yoh_.shape[1])
-    ptlr.train(torch.tensor(X), torch.tensor(Yoh_), 10000, 0.05, 1e-3)
+    ptlr.train(torch.tensor(X, dtype=torch.float), torch.tensor(Yoh_), 1000, 1e-2, 0.5)
     Y = ptlr.eval(X)
 
     accuracy, recall, precision = eval_perf_multi(Y, Y_)

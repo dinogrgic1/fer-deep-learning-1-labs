@@ -2,10 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 
-import pdb
-import IPython
-
-
 class Random2DGaussian:
   """Random bivariate normal distribution sampler
 
