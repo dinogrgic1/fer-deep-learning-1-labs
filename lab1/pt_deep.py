@@ -41,7 +41,7 @@ class PTDeep(torch.nn.Module):
             - param_niter:  number of training iterations
             - param_delta: learning rate
         """
-        optimizer = torch.optim.SGD(params=self.parameters(), lr = param_delta)
+        optimizer = torch.optim.SGD(params=self.parameters(), lr = param_delta, weight_decay = param_lambdba)
         for i in range(param_niter + 1):
             loss = self.get_loss(X, Yoh_, param_lambdba)
             loss.backward()

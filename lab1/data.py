@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import random
 
 class Random2DGaussian:
   """Random bivariate normal distribution sampler
@@ -16,7 +15,6 @@ class Random2DGaussian:
       get_sample(n): samples n datapoints
 
   """
-
   d0min = 0
   d0max = 10
   d1min = 0
@@ -151,16 +149,12 @@ def eval_AP(ranked_labels):
   fp = neg
 
   sumprec = 0
-  #IPython.embed()
   for x in ranked_labels:
     precision = tp / (tp + fp)
     recall = tp / (tp + fn)
 
     if x:
       sumprec += precision
-
-    #print (x, tp,tn,fp,fn, precision, recall, sumprec)
-    #IPython.embed()
 
     tp -= x
     fn += x
@@ -198,3 +192,11 @@ def sample_gmm_2d(ncomponents, nclasses, nsamples):
   Y_ = np.hstack([[Y]*nsamples for Y in Ys])
 
   return X, Y_
+
+def get_box(X):
+  return (np.min(X, axis=0) - 0.5, np.max(X, axis=0))
+
+def metrics_print(accuracy, pr, ap):
+  print(f'Accuracy: {accuracy:.4f}')
+  print(f'Precision: {np.mean(pr, axis=0)[0]:.4f}')
+  print(f'Recall: {np.mean(pr, axis=0)[1]:.4f}')
