@@ -1,6 +1,5 @@
 from data import *
 from matplotlib import pyplot as plt
-import torch
 
 from fcann2 import *
 from pt_linreg import LinearRegression
@@ -26,15 +25,12 @@ def second():
 
 def third():
     lr = LinearRegression()
+    func = lambda x : 3 * x + 4
 
-    X = torch.tensor([1, 2])
-    Y_= torch.tensor([3, 5])
-    _ = lr.train(X, Y_)
+    X = [x for x in range(0, 50)]
+    Y_= [func(x) for x in X]
+    _ = lr.train(X, Y_, 10000, 0.0005)
 
-    rect = (torch.min(X, axis=0), torch.max(X, axis=0))
-    graph_surface(lr.classify, rect)
-    graph_data(X, Y_, lr.classify(X), special=[])
-    plt.show()
 
 
 if __name__ == '__main__':
