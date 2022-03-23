@@ -194,7 +194,7 @@ def sample_gmm_2d(ncomponents, nclasses, nsamples):
   return X, Y_
 
 def get_box(X):
-  return (np.min(X, axis=0) - 0.5, np.max(X, axis=0))
+  return (np.min(X, axis=0) - 0.5, np.max(X, axis=0) + 0.5)
 
 def metrics_print(accuracy, pr, ap):
   print(f'Accuracy: {accuracy:.4f}')

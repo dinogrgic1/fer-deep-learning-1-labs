@@ -15,16 +15,18 @@ x_test, y_test = mnist_test.data, mnist_test.targets
 x_train, x_test = x_train.float().div_(255.0), x_test.float().div_(255.0)
 
 y_train_oh = class_to_onehot(y_train)
-x_train = torch.tensor(x_train, dtype=torch.float).clone().view(-1, 784)
-x_test = torch.tensor(x_test, dtype=torch.float).clone().view(-1, 784)
+x_train = torch.tensor(x_train, dtype=torch.float).clone().detach().reshape(-1, 784)
+x_test = torch.tensor(x_test, dtype=torch.float).clone().detach().reshape(-1, 784)
 
 CONFIGS = [[784, 10]]
 #CONFIGS = [[784, 10], [784, 100, 10], [784, 100, 100, 10], [784, 100, 100, 100, 10]]
 for config in CONFIGS:
     ptlr = PTDeep(config, torch.relu)
-    ptlr.train(x_train, torch.tensor(y_train_oh), 5000, 0.1)
+    ptlr.train(x_train, torch.tensor(y_train_oh), 3000, 0.5, 1e-2)
     Y = ptlr.eval(x_test.detach().numpy())
 
+    print(Y)
+    print(y_test)
     accuracy, pr, M = eval_perf_multi(Y, y_test)
     metrics_print(accuracy, pr, None)
         

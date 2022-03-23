@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-from data import sample_gmm_2d, class_to_onehot, eval_perf_multi, graph_surface, graph_data
+from data import *
 
 class PTLogreg(torch.nn.Module):
     def __init__(self, D: int, C: int) -> None:
@@ -33,7 +33,7 @@ class PTLogreg(torch.nn.Module):
             - param_niter:  number of training iterations
             - param_delta: learning rate
         """
-        optimizer = torch.optim.SGD(params=self.parameters(), lr = param_delta)
+        optimizer = torch.optim.SGD(params=self.parameters(), lr = param_delta, weight_decay = param_lambdba)
         for i in range(param_niter + 1):
             loss = self.get_loss(X, Yoh_, param_lambdba)
             loss.backward()
@@ -54,23 +54,27 @@ class PTLogreg(torch.nn.Module):
         probs = probs.detach().numpy()
         return np.argmax(probs, axis=1)
 
+# Zadatak 4
 if __name__ == "__main__":
     np.random.seed(100)
     
-    C = 3
-    X, Y_ = sample_gmm_2d(3, C, 3)
+    _C = 3
+    _NITER = 1000
+    _LAMBDAS = [1e-3, 1e-2, 0, 0.5, 1]
+    _DELTA = 1e-2
+
+    X, Y_ = sample_gmm_2d(3, _C, 10)
     Yoh_ = class_to_onehot(Y_)
 
-    ptlr = PTLogreg(X.shape[1], Yoh_.shape[1])
-    ptlr.train(torch.tensor(X, dtype=torch.float), torch.tensor(Yoh_), 1000, 1e-2, 0.5)
-    Y = ptlr.eval(X)
+    for _L in _LAMBDAS:
+        ptlr = PTLogreg(X.shape[1], Yoh_.shape[1])
+        ptlr.train(torch.tensor(X, dtype=torch.float), torch.tensor(Yoh_), _NITER, _DELTA, _L)
+        Y = ptlr.eval(X)
 
-    accuracy, recall, precision = eval_perf_multi(Y, Y_)
-    print(f'accuracy: {accuracy:.4f}')
-    for i in range(C):
-        print(f'class #{i} recall: {recall[i]}\tprecision: {precision[i]}')
+        accuracy, pr, M = eval_perf_multi(Y, Y_)
+        metrics_print(accuracy, pr, None)
 
-    box = (np.min(X, axis=0) - 0.5, np.max(X, axis=0) + 0.5)
-    graph_surface(ptlr.eval, box, 0.5, 1024, 1024)
-    graph_data(torch.tensor(X), torch.tensor(Y_), torch.tensor(Y))
-    plt.show()
+        graph_surface(ptlr.eval, get_box(X), 0.5, 1024, 1024)
+        graph_data(torch.tensor(X), torch.tensor(Y_), torch.tensor(Y))
+        plt.title(f'λ = {_L} | Δ = {_DELTA} | N = {_NITER}')
+        plt.show()

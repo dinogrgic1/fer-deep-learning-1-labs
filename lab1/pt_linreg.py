@@ -1,7 +1,5 @@
 import torch
-import torch.nn as nn
 import torch.optim as optim
-import numpy as np
 
 class LinearRegression:
     def __debug_grads(self, grad_a_troch, grad_a_ours, grad_b_torch, grad_b_ours):
@@ -18,7 +16,7 @@ class LinearRegression:
         self.a = torch.randn(1, requires_grad=True)
         self.b = torch.randn(1, requires_grad=True)
         optimizer = optim.SGD([self.a, self.b], lr = self.delta)
-        for i in range(self.ntimes + 1):
+        for i in range(1, self.ntimes + 1):
             pred_y = self.a * self.X + self.b
             diff = (self.Y_ - pred_y)
             loss = torch.mean(diff ** 2)
@@ -34,9 +32,18 @@ class LinearRegression:
             
             optimizer.zero_grad()
 
-        
         return Y_
 
     def classify(self, X):
         X = torch.tensor(X)
         return self.a * X + self.b
+
+# Zadatak 3
+if __name__ == '__main__':
+    lr = LinearRegression()
+    func = lambda x : 3 * x + 4
+    __N = 20
+
+    X = [x for x in range(0, __N)]
+    Y_= [func(x) for x in X]
+    _ = lr.train(X, Y_, 10000, 0.005)

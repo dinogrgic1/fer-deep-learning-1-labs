@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-from data import sample_gmm_2d, class_to_onehot, eval_perf_multi, graph_surface, graph_data
+from data import *
 
 class PTDeep(torch.nn.Module):
     def __init__(self, config: np.array, activ_function) -> None:
@@ -14,8 +14,8 @@ class PTDeep(torch.nn.Module):
         w_s = []
         b_s = []
         for i in range(0, len(config)-1):
-            w_s.append(torch.nn.Parameter(torch.randn((config[i], config[i + 1])), requires_grad=True))
-            b_s.append(torch.nn.Parameter(torch.zeros(config[i + 1]), requires_grad=True))
+            w_s.append(torch.nn.Parameter(torch.randn((config[i], config[i + 1]),  dtype=torch.float), requires_grad=True))
+            b_s.append(torch.nn.Parameter(torch.zeros(config[i + 1], dtype=torch.float), requires_grad=True))
 
         self.weights = torch.nn.ParameterList(w_s)
         self.biases = torch.nn.ParameterList(b_s)
@@ -23,15 +23,14 @@ class PTDeep(torch.nn.Module):
         
 
     def forward(self, X: torch.tensor) -> torch.tensor:
-        output = X
         for layer in range(len(self.weights)):
-            output = output.mm(self.weights[layer]) + self.biases[layer]
-            output = self.activation(output)
-        return torch.softmax(output, dim=1)
+            X = X.mm(self.weights[layer]) + self.biases[layer]
+            X = self.activation(X)
+        return torch.softmax(X, dim=1)
 
     def get_loss(self, X: torch.tensor, Yoh_: torch.tensor, param_lambdba: float) -> torch.tensor:
         probs = self.forward(X)
-        return -torch.mean(torch.sum(torch.log(probs) * Yoh_, dim=1))
+        return -torch.mean(torch.sum(torch.log(probs + 1e-13) * Yoh_, dim=1))
 
 
     def train(self, X: torch.tensor, Yoh_: torch.tensor, param_niter: int, param_delta: float, param_lambdba = 0.) -> None:
@@ -58,25 +57,28 @@ class PTDeep(torch.nn.Module):
         probs = probs.detach().numpy()
         return np.argmax(probs, axis=1)
 
+# Zadatak 5
 if __name__ == "__main__":
     np.random.seed(100)
     
-    CONFIGS = [[2, 2], [2, 10, 2], [2, 10, 10, 2]]
-    X, Y_ = sample_gmm_2d(4, 2, 40)
-    Yoh_ = class_to_onehot(Y_)
+    _CONFIGS = [[2, 2], [2, 10, 2], [2, 10, 10, 2], [2, 10, 10, 3]]
+    _LAMBDA = 1e-3
+    _DELTA = 1e-2
+    _NITER = 5000
 
-    for config in CONFIGS:
+    for config in _CONFIGS:
+        X, Y_ = sample_gmm_2d(6, config[-1], 20)
+        Yoh_ = class_to_onehot(Y_)
+
         ptlr = PTDeep(config, torch.sigmoid)
-        ptlr.train(torch.tensor(X, dtype=torch.float), torch.tensor(Yoh_), 1000, 1e-2, 0.5)
+        ptlr.train(torch.tensor(X, dtype=torch.float), torch.tensor(Yoh_), _NITER, _DELTA, _LAMBDA)
         Y = ptlr.eval(X)
 
-        accuracy, recall, precision = eval_perf_multi(Y, Y_)
-        print(f'accuracy: {accuracy:.4f}')
-        for i in range(2):
-            print(f'class #{i} recall: {recall[i]}\tprecision: {precision[i]}')
+        accuracy, pr, M = eval_perf_multi(Y, Y_)
+        metrics_print(accuracy, pr, M)
 
-        box = (np.min(X, axis=0) - 0.5, np.max(X, axis=0) + 0.5)
-        graph_surface(ptlr.eval, box, 0.5, 1024, 1024)
+        graph_surface(ptlr.eval, get_box(X), 0.5, 1024, 1024)
         graph_data(torch.tensor(X), torch.tensor(Y_), torch.tensor(Y))
+        plt.title(f'Configuration {config} | λ = {_LAMBDA} | Δ = {_DELTA} | N = {_NITER}')
         plt.show()
         
