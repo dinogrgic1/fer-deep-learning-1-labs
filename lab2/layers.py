@@ -308,14 +308,13 @@ class L2Regularizer():
      Returns:
       Scalar, loss due to the L2 regularization.
     """
-    return self.weight_decay * np.sum(self.weights ** 2)
+    return (1 / 2) * self.weight_decay * np.sum(self.weights ** 2)
 
   def backward_params(self):
     """
     Returns:
       Gradient of the L2 loss with respect to the regularized weights.
     """
-    # TODO
     grad_weights = self.weight_decay * self.weights
     return [[self.weights, grad_weights], self.name]
 

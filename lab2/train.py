@@ -3,17 +3,20 @@ from pathlib import Path
 
 import numpy as np
 from torchvision.datasets import MNIST
+from datetime import datetime
 
 import nn
 import layers
 
+NOW_DATE = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 DATA_DIR = Path(__file__).parent / 'datasets' / 'MNIST'
-SAVE_DIR = Path(__file__).parent / 'out' / 'train'
+SAVE_DIR = Path(__file__).parent / 'out' / 'train' / NOW_DATE
 
 config = {}
 config['max_epochs'] = 8
 config['batch_size'] = 50
 config['save_dir'] = SAVE_DIR
+config['time'] = datetime.now().strftime("%Y_%m_%d-%I:%M:%S_%p")
 config['lr_policy'] = {1:{'lr':1e-1}, 3:{'lr':1e-2}, 5:{'lr':1e-3}, 7:{'lr':1e-4}}
 
 def dense_to_one_hot(y, class_count):

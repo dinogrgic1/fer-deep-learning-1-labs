@@ -35,7 +35,7 @@ def sgd_update_params(grads, config):
       params -= lr * grads
       
 
-def draw_conv_filters(epoch, step, layer, save_dir):
+def draw_conv_filters(epoch, step, layer, save_dir, acc):
   C = layer.C
   w = layer.weights.copy()
   num_filters = w.shape[0]
@@ -55,7 +55,7 @@ def draw_conv_filters(epoch, step, layer, save_dir):
       r = int(j / cols) * (k + border)
       c = int(j % cols) * (k + border)
       img[r:r+k,c:c+k] = w[j,i]
-    filename = '%s_epoch_%02d_step_%06d_input_%03d.png' % (layer.name, epoch, step, i)
+    filename = '%s_epoch_%02d_step_%06d_input_%03d_acc_%04f.png' % (layer.name, epoch, step, i, acc)
     if not os.path.isdir(save_dir):
       os.makedirs(save_dir)
     ski.io.imsave(os.path.join(save_dir, filename), img)
@@ -95,7 +95,7 @@ def train(train_x, train_y, valid_x, valid_y, net, loss, config):
       if i % 5 == 0:
         print("epoch %d, step %d/%d, batch loss = %.2f" % (epoch, i*batch_size, num_examples, loss_val))
       if i % 100 == 0:
-        draw_conv_filters(epoch, i*batch_size, net[0], save_dir)
+        draw_conv_filters(epoch, i*batch_size, net[0], save_dir, (cnt_correct / ((i+1)*batch_size) * 100))
         #draw_conv_filters(epoch, i*batch_size, net[3])
       if i > 0 and i % 50 == 0:
         print("Train accuracy = %.2f" % (cnt_correct / ((i+1)*batch_size) * 100))
