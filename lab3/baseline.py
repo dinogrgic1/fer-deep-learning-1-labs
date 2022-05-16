@@ -5,21 +5,26 @@ import numpy as np
 from datetime import datetime
 from sklearn.metrics import confusion_matrix
 
-from utils import save_file_json, save_file_torch
+from utils import save_file_json, save_file_torch, model_metrics
 
 
 SAVE_MODEL_DIR = 'saved'
+SAVE_MODEL_NAME = 'baseline'
+TASK = 'task_2'
 
 class BaselineModel(nn.Module):
-    def __init__(self, embedding_matrix, optimizer, lr=1e-4):
+    def __init__(self, embedding_matrix, optimizer, lr=1e-4, *args, **kwargs):
         super().__init__()
+        
         self.fc1 = torch.nn.Linear(300, 150)
         self.fc2 = torch.nn.Linear(150, 150)
         self.fc3 = torch.nn.Linear(150, 1)
         self.loss =  torch.nn.BCEWithLogitsLoss()
-
+        
+        self.kwargs = kwargs
         self.embedding_matrix = embedding_matrix
-        self.optimizer = optimizer(self.get_parameters(), lr=lr)
+        self.lr = lr
+        self.optimizer = optimizer(self.get_parameters(), lr=self.lr)
 
         self.reset_parameters()
 
@@ -52,9 +57,9 @@ class BaselineModel(nn.Module):
             y = y.round().int().squeeze(-1)
         return y
 
-    def fit(self, train, valid, epochs):
-        loss_train = []
-        loss_validation = []
+    def fit(self, train, valid, test, epochs):
+        metrics_train = []
+        metrics_validation = []
 
         self.train()
         num_examples = len(train.dataset)
@@ -62,35 +67,57 @@ class BaselineModel(nn.Module):
         for epoch in range(1, epochs + 1):
             loss_avg = []
             self.train()
+            y_pred = []
+            y_real = []
             
             for i, batch in enumerate(train):
                 loss = self.loss(self.forward(batch[0]).squeeze(-1), batch[1].float())
                 loss.backward()
                 
+                y_pred.append(self.infer(batch[0]))
+                y_real.append(batch[1])
                 loss_avg.append(float(loss))
-                #torch.nn.utils.clip_grad_norm_(self.parameters(), args.clip)
                 self.optimizer.step()
 
                 if i % 100 == 0:
                     print(f'Training epoch #{epoch}, step {i * len(batch[0])}/{num_examples}, batch loss = {np.mean(loss_avg):.04f}')
                 self.optimizer.zero_grad()
 
+            y_pred = torch.cat(y_pred)
+            y_real = torch.cat(y_real)
+
+            train_metrics = model_metrics(y_real, y_pred)
+            train_metrics['loss'] = np.average(loss_avg)
+            metrics_train.append(train_metrics)
             with torch.no_grad():
                 validation_metrics = self.evaluate(valid)
+                
+                print(f"Train epoch #{epoch}\n"
+                      f"\tloss: {train_metrics['loss']:.04f}\n"
+                      f"\tacc: {train_metrics['accuracy']:.04f}\n"
+                      f"\tf1: {train_metrics['f1']:.04f}\n")
 
                 print(f"Validation epoch #{epoch}\n"
                       f"\tloss: {validation_metrics['loss']:.04f}\n"
-                      f"\tacc: {validation_metrics['acc']:.04f}\n"
+                      f"\tacc: {validation_metrics['accuracy']:.04f}\n"
                       f"\tf1: {validation_metrics['f1']:.04f}\n")
 
-        
-        now_str = datetime.now().strftime('%d_%m_%Y_%H_%M_%S')
-        save_file_torch(f'{SAVE_MODEL_DIR}/2', f'baseline_model_{now_str}.pth', self.state_dict())
+                metrics_validation.append(validation_metrics)
 
-        loss_validation = [str(x) for x in loss_validation]
-        loss_train = [str(x) for x in loss_train]
-        file = {"loss_validation": loss_validation, "loss_train": loss_train}
-        save_file_json(f'{SAVE_MODEL_DIR}/2', f'model_{now_str}.json', file)
+        
+        with torch.no_grad():
+            test_metrics = self.evaluate(test)
+            
+            print(f"Test\n"
+                      f"\tloss: {test_metrics['loss']:.04f}\n"
+                      f"\tacc: {test_metrics['accuracy']:.04f}\n"
+                      f"\tf1: {test_metrics['f1']:.04f}\n")
+
+        now_str = datetime.now().strftime('%d_%m_%Y_%H_%M_%S')
+        save_file_torch(f'{SAVE_MODEL_DIR}/{TASK}', f'{SAVE_MODEL_NAME}_{now_str}.pth', self.state_dict())
+        file = {'epochs': epochs, 'lr': self.lr, 'train': metrics_train, 'validation': metrics_validation, 'test': test_metrics}
+        file = {**self.kwargs, **file}
+        save_file_json(f'{SAVE_MODEL_DIR}/{TASK}', f'{SAVE_MODEL_NAME}_{now_str}.json', file)
 
     def evaluate(self, validate):    
         x, y = zip(*[(entry[0].squeeze(0), entry[1]) for entry in list(validate)])
@@ -102,26 +129,12 @@ class BaselineModel(nn.Module):
 
         for _x, _y in zip(x, y):
             y_pred.append(self.infer(_x))
-            y_pred_tensor = torch.tensor(y_pred[-1]).float().view(_y.shape)
-
+            y_pred_tensor = y_pred[-1].clone().detach().float().view(_y.shape)
             losses.append(float(self.loss(_y.float(), y_pred_tensor)))
 
-        cm = confusion_matrix(np.array(y, dtype=np.int32), np.array(y_pred, dtype=np.int32))
-        cm_diag = np.diag(cm)
+        y_pred = torch.cat(y_pred)
+        y_real = torch.cat(y)
 
-        sums = [np.sum(cm, axis=y) for y in [None, 0, 1]]
-
-        sums[0] = np.maximum(1, sums[0])
-        for i in range(1, len(sums)):
-            sums[i][sums[i] == 0] = 1
-
-        accuracy = np.sum(cm_diag) / sums[0]
-        precision, recall = [np.mean(cm_diag / x) for x in sums[1:]]
-        f1 = (2 * precision * recall) / (precision + recall)
-
-        return {"loss": float(np.mean(losses)),
-                "acc": accuracy,
-                "pr": precision,
-                "re": recall,
-                "f1": f1,
-                "cm": np.ndarray.tolist(cm)}
+        metrics = model_metrics(y_real, y_pred)
+        metrics['loss'] = float(np.mean(losses))
+        return metrics

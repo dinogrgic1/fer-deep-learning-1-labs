@@ -2,8 +2,9 @@ from dataclasses import dataclass
 import pandas as pd
 import torch
 import numpy as np
+import random
 
-from baseline import BaselineModel
+from rnn import RNNModel
 
 def key_add_one(dict, key):
     if key not in dict:
@@ -27,7 +28,7 @@ def pad_collate_fn(batch, pad_index=0):
     lengths = torch.tensor([len(text) for text in texts])
     max_length = torch.max(lengths)
 
-    texts = torch.tensor([np.concatenate((text, np.zeros(max_length - len(text), dtype=np.int32)), pad_index) for text in texts])
+    texts = torch.tensor(np.array([np.concatenate((text, np.zeros(max_length - len(text), dtype=np.int32)), pad_index) for text in texts]))
     labels = torch.tensor([label.numpy()[0] for label in labels], dtype=torch.float32)
     return texts, labels, lengths
 
@@ -131,17 +132,43 @@ class Vocab:
 
 
 if __name__=='__main__':
-    torch.manual_seed(7052020)
-    np.random.seed(7052020)
+    
 
     train_dataset = NLPDataset.from_file('dataset/sst_train_raw.csv', min_freq=1, max_size=-1)
     embedding_matrix_train = train_dataset.text_vocab.embedding()
     test_dataset = NLPDataset.from_file('dataset/sst_test_raw.csv', min_freq=1, max_size=-1, text_vocab=train_dataset.text_vocab, label_vocab=train_dataset.label_vocab)
     valid_dataset = NLPDataset.from_file('dataset/sst_valid_raw.csv', min_freq=1, max_size=-1, text_vocab=train_dataset.text_vocab, label_vocab=train_dataset.label_vocab)
     
-    train = torch.utils.data.DataLoader(dataset=train_dataset, shuffle=False, batch_size=10, collate_fn=pad_collate_fn)
-    test = torch.utils.data.DataLoader(dataset=test_dataset, shuffle=False, batch_size=32, collate_fn=pad_collate_fn)
-    valid = torch.utils.data.DataLoader(dataset=valid_dataset, shuffle=False, batch_size=1, collate_fn=pad_collate_fn)
+    train = torch.utils.data.DataLoader(dataset=train_dataset, shuffle=True, batch_size=10, collate_fn=pad_collate_fn)
+    test = torch.utils.data.DataLoader(dataset=test_dataset, shuffle=True, batch_size=32, collate_fn=pad_collate_fn)
+    valid = torch.utils.data.DataLoader(dataset=valid_dataset, shuffle=True, batch_size=32, collate_fn=pad_collate_fn)
 
-    model = BaselineModel(embedding_matrix_train, torch.optim.Adam, lr=1e-3)
-    model.fit(train, valid, 10)
+    # for i in range(0, 5):
+    #     seed = random.getrandbits(32)
+    #     torch.manual_seed(seed)
+    #     np.random.seed(seed)
+    #     model = BaselineModel(embedding_matrix_train, torch.optim.Adam, lr=1e-3, seed=seed, test_number=i)
+    #     model.fit(train, valid, test, 5)
+
+    # for i in range(0, 5):
+    #     seed = random.getrandbits(32)
+    #     torch.manual_seed(seed)
+    #     np.random.seed(seed)
+    #     model = LSTMModel(embedding_matrix_train, torch.optim.Adam, lr=1e-4, seed=seed, test_number=i)
+    #     model.fit(train, valid, test, 5)
+
+    combination_1 = (random.randrange(100, 601), random.randrange(2, 10), random.uniform(0.1, 0.9))
+    combination_2 = (random.randrange(100, 601), random.randrange(2, 10), random.uniform(0.1, 0.9))
+    combination_3 = (random.randrange(100, 601), random.randrange(2, 10), random.uniform(0.1, 0.9))
+    
+    for cell in [torch.nn.RNN, torch.nn.GRU, torch.nn.LSTM]:
+        for hidden_size, num_layers, dropout in (combination_1, combination_2, combination_3):
+            
+            seed = random.getrandbits(32)
+            torch.manual_seed(seed)
+            np.random.seed(seed)
+
+            name = f'{str(cell)}_{hidden_size}_{num_layers}_{dropout}'
+            print(f'MODEL: {name}\n')
+            model = RNNModel(embedding_matrix_train, torch.optim.Adam, rnn=cell, lr=1e-4, seed=seed, hidden_size=hidden_size, num_layers=num_layers, dropout=dropout, name=name)
+            model.fit(train, valid, test, 5)
